@@ -59,9 +59,15 @@ class EmailSyncManager extends EventEmitter {
     const currentAttempt = account._reconnectAttempts || 0;
     account._reconnectAttempts = currentAttempt + 1;
     const baseDelay = 5000;
-    const maxDelay = 300000;
+    const maxDelay = 300000; // 5 minutes
+    const maxAttempts = 5; // Limit retries
+    if (currentAttempt >= maxAttempts) {
+      console.error(`Max reconnection attempts (${maxAttempts}) reached for ${account.user}, stopping retries`);
+      this.closeAccount(account.user);
+      return;
+    }
     const delay = Math.min(baseDelay * Math.pow(1.5, currentAttempt), maxDelay);
-    console.log(`Scheduling reconnect for ${account.user} in ${delay/1000} seconds`);
+    console.log(`Scheduling reconnect for ${account.user} in ${delay/1000} seconds (attempt ${currentAttempt + 1}/${maxAttempts})`);
     setTimeout(() => {
       if (this.connectionStates[account.user] !== 'connected') {
         console.log(`Attempting to reconnect ${account.user}...`);
@@ -252,14 +258,15 @@ class EmailSyncManager extends EventEmitter {
     if (this.monitors[`${user}_monitor`]) {
       clearInterval(this.monitors[`${user}_monitor`]);
     }
-    const MONITOR_INTERVAL = 30000;
+    const MONITOR_INTERVAL = 10000; // 10 seconds
+    console.log(`Setting up connection monitor every ${MONITOR_INTERVAL/1000} seconds for ${user}`);
     this.monitors[`${user}_monitor`] = setInterval(async () => {
       const imap = this.accounts[user];
       const currentState = imap ? imap.state : 'unknown';
       console.log(`Connection state for ${user}: ${currentState}`);
       if (imap && currentState === 'authenticated') {
         try {
-          await this.imapSearch(imap, ['ALL']); 
+          await this.imapSearch(imap, ['ALL']);
           console.log(`Sent keep-alive SEARCH to ${user}`);
         } catch (err) {
           console.error(`Error sending keep-alive for ${user}:`, err);
