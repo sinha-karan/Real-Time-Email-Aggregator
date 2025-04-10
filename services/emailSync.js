@@ -209,30 +209,19 @@ class EmailSyncManager extends EventEmitter {
     this.setupPolling(user); 
   }
 
-  setupPolling(user) {
-    if (this.monitors[`${user}_poll`]) {
-      clearInterval(this.monitors[`${user}_poll`]);
-    }
-    const POLLING_INTERVAL = 15000; 
-    console.log(`Setting up polling every ${POLLING_INTERVAL/1000} seconds for ${user}`);
-    this.monitors[`${user}_poll`] = setInterval(async () => {
-      if (this.connectionStates[user] === 'connected') {
-        await this.checkForNewEmails(user);
-      }
-    }, POLLING_INTERVAL);
-  }
-  
-  
   async checkForNewEmails(user) {
     const imap = this.accounts[user];
     console.log(`Checking for new emails for ${user}`);
     try {
       const results = await this.imapSearch(imap, ['UNSEEN']);
+      console.log(`Search returned ${results.length} UNSEEN emails for ${user}:`, results);
       if (results.length > 0) {
         console.log(`Found ${results.length} unseen emails for ${user} on check`);
         const sortedResults = results.sort((a, b) => b - a);
         const latestResults = sortedResults.slice(0, 5);
+        console.log(`Fetching latest ${latestResults.length} emails with UIDs:`, latestResults);
         const emails = await this.fetchEmailBatch(user, latestResults);
+        console.log(`Fetched ${emails.length} emails for ${user}`);
         this.emit('emails', { account: user, emails, isNew: true });
       } else {
         console.log(`No unseen emails found for ${user} on check`);
@@ -240,6 +229,24 @@ class EmailSyncManager extends EventEmitter {
     } catch (err) {
       console.error(`Error checking for new emails for ${user}:`, err);
     }
+  }
+  
+  setupPolling(user) {
+    if (this.monitors[`${user}_poll`]) {
+      clearInterval(this.monitors[`${user}_poll`]);
+    }
+    const POLLING_INTERVAL = 15000; // 15 seconds
+    console.log(`Setting up polling every ${POLLING_INTERVAL/1000} seconds for ${user}`);
+    this.monitors[`${user}_poll`] = setInterval(async () => {
+      const imap = this.accounts[user];
+      const currentState = imap ? imap.state : 'unknown';
+      console.log(`Polling check for ${user}, state: ${currentState}`);
+      if (currentState === 'authenticated') {
+        await this.checkForNewEmails(user);
+      } else {
+        console.log(`Skipping poll for ${user}: state is ${currentState}`);
+      }
+    }, POLLING_INTERVAL);
   }
 
   imapSearch(imap, criteria) {
