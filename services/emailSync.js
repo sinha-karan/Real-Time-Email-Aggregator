@@ -1,3 +1,4 @@
+const elasticSearch = require('./elasticSearch');
 const Imap = require('imap');
 const { simpleParser } = require('mailparser');
 const { promisify } = require('util');
@@ -12,10 +13,9 @@ class EmailSyncManager extends EventEmitter {
     this.monitors = {};
   }
 
-  start() {
-    this.config.forEach(account => {
-      this.setupAccount(account);
-    });
+  async start() {
+    await elasticSearch.ensureIndex();
+    this.config.forEach(account => this.setupAccount(account));
     return this;
   }
 
@@ -138,6 +138,7 @@ class EmailSyncManager extends EventEmitter {
       try {
         const emails = await this.fetchEmailBatch(user, batch);
         this.emit('emails', { account: user, emails, isNew: false });
+        await elasticSearch.storeEmails(user, emails);
       } catch (err) {
         console.error(`Error processing batch ${i+1} for ${user}:`, err);
       }
@@ -198,15 +199,15 @@ class EmailSyncManager extends EventEmitter {
     imap.on('mail', async (numNew) => {
       console.log(`${numNew} new email(s) received for ${user}`);
       try {
-        await this.fetchNewEmails(user, numNew);
+        await this.checkForNewEmails(user);
       } catch (err) {
         console.error(`Error fetching new emails for ${user}:`, err);
       }
     });
   
     console.log(`Setting up real-time sync for ${user}`);
-    this.checkForNewEmails(user);
-    this.setupPolling(user); 
+    this.checkForNewEmails(user); // Initial check
+    this.setupPolling(user); // Backup polling
   }
 
   async checkForNewEmails(user) {
@@ -223,6 +224,7 @@ class EmailSyncManager extends EventEmitter {
         const emails = await this.fetchEmailBatch(user, latestResults);
         console.log(`Fetched ${emails.length} emails for ${user}`);
         this.emit('emails', { account: user, emails, isNew: true });
+        await elasticSearch.storeEmails(user, emails);
       } else {
         console.log(`No unseen emails found for ${user} on check`);
       }
