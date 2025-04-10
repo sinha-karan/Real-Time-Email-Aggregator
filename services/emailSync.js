@@ -200,14 +200,14 @@ class EmailSyncManager extends EventEmitter {
   
     console.log(`Setting up real-time sync for ${user}`);
     this.checkForNewEmails(user);
-    this.setupPolling(user); // Always poll, skip IDLE for now
+    this.setupPolling(user); 
   }
 
   setupPolling(user) {
     if (this.monitors[`${user}_poll`]) {
       clearInterval(this.monitors[`${user}_poll`]);
     }
-    const POLLING_INTERVAL = 15000; // 15 seconds for faster testing
+    const POLLING_INTERVAL = 15000; 
     console.log(`Setting up polling every ${POLLING_INTERVAL/1000} seconds for ${user}`);
     this.monitors[`${user}_poll`] = setInterval(async () => {
       if (this.connectionStates[user] === 'connected') {
@@ -216,7 +216,7 @@ class EmailSyncManager extends EventEmitter {
     }, POLLING_INTERVAL);
   }
   
-  // Add this new method (reused from polling logic)
+  
   async checkForNewEmails(user) {
     const imap = this.accounts[user];
     console.log(`Checking for new emails for ${user}`);
@@ -259,7 +259,7 @@ class EmailSyncManager extends EventEmitter {
       console.log(`Connection state for ${user}: ${currentState}`);
       if (imap && currentState === 'authenticated') {
         try {
-          await this.imapSearch(imap, ['ALL']); // Simple search to keep alive
+          await this.imapSearch(imap, ['ALL']); 
           console.log(`Sent keep-alive SEARCH to ${user}`);
         } catch (err) {
           console.error(`Error sending keep-alive for ${user}:`, err);
