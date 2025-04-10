@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "dotenv": "^16.4.7",
-    "imap": "^0.8.19"
+    "imap": "^0.8.19",
+    "mailparser": "^3.7.2"
   }
 }
