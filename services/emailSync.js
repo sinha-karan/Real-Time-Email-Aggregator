@@ -198,16 +198,11 @@ class EmailSyncManager extends EventEmitter {
     const imap = this.accounts[user];
     imap.on('mail', async (numNew) => {
       console.log(`${numNew} new email(s) received for ${user}`);
-      try {
-        await this.checkForNewEmails(user);
-      } catch (err) {
-        console.error(`Error fetching new emails for ${user}:`, err);
-      }
+      await this.checkForNewEmails(user);
     });
   
     console.log(`Setting up real-time sync for ${user}`);
-    this.checkForNewEmails(user); // Initial check
-    this.setupPolling(user); // Backup polling
+    this.checkForNewEmails(user);
   }
 
   async checkForNewEmails(user) {
@@ -215,18 +210,17 @@ class EmailSyncManager extends EventEmitter {
     console.log(`Checking for new emails for ${user}`);
     try {
       const results = await this.imapSearch(imap, ['UNSEEN']);
-      console.log(`Search returned ${results.length} UNSEEN emails for ${user}:`, results);
+      console.log(`Found ${results.length} UNSEEN emails for ${user}`);
       if (results.length > 0) {
-        console.log(`Found ${results.length} unseen emails for ${user} on check`);
         const sortedResults = results.sort((a, b) => b - a);
         const latestResults = sortedResults.slice(0, 5);
         console.log(`Fetching latest ${latestResults.length} emails with UIDs:`, latestResults);
         const emails = await this.fetchEmailBatch(user, latestResults);
-        console.log(`Fetched ${emails.length} emails for ${user}`);
         this.emit('emails', { account: user, emails, isNew: true });
         await elasticSearch.storeEmails(user, emails);
-      } else {
-        console.log(`No unseen emails found for ${user} on check`);
+        // Mark as seen
+        await imap.addFlags(latestResults, ['\\Seen']);
+        console.log(`Marked ${latestResults.length} emails as seen for ${user}`);
       }
     } catch (err) {
       console.error(`Error checking for new emails for ${user}:`, err);

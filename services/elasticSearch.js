@@ -2,18 +2,13 @@ const { Client } = require('@elastic/elasticsearch');
 
 class ElasticSearchManager {
   constructor() {
-    this.client = new Client({ 
-      node: 'http://elasticsearch:9200' // Docker link name
-    });
+    this.client = new Client({ node: 'http://elasticsearch:9200' });
     this.indexName = 'emails';
   }
 
   async ensureIndex() {
     try {
-      const { body: exists } = await this.client.indices.exists({ 
-        index: this.indexName 
-      });
-      
+      const { body: exists } = await this.client.indices.exists({ index: this.indexName });
       if (!exists) {
         await this.client.indices.create({
           index: this.indexName,
@@ -37,29 +32,22 @@ class ElasticSearchManager {
       return true;
     } catch (err) {
       console.error('Index initialization failed:', err);
-      return false; // Don’t crash
+      return false;
     }
   }
 
   async storeEmails(account, emails) {
     if (!emails || !emails.length) return { success: true };
-
     try {
       const body = emails.flatMap(email => [
         { index: { _index: this.indexName, _id: `${account}-${email.uid}` } },
         { ...email, account }
       ]);
-
-      const response = await this.client.bulk({ 
-        body,
-        refresh: true // Ensure immediate search availability
-      });
-
+      const response = await this.client.bulk({ body, refresh: true });
       if (response.errors) {
         console.error('Bulk indexing errors:', response.items);
         return { success: false };
       }
-      
       console.log(`Stored ${emails.length} emails for ${account}`);
       return { success: true };
     } catch (err) {
